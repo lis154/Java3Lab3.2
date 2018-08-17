@@ -1,0 +1,153 @@
+Методы класса:
+
+int available() - возвращает количество байтов ввода, доступные в данный момент для чтения
+close() - закрывает источник ввода. Следующие попытки чтения передадут исключение IOException
+void mark(int readlimit) - помещает метку в текущую точку входного потока, которая остаётся корректной до тех пор, пока не будет прочитано readlimint байт
+boolean markSupported() - возвращает true, если методы mark() и reset() поддерживаются потоком
+int read() - возвращает целочисленное представление следующего доступного байта в потоке. При достижении конца файла возвращается значение -1
+int	read(byte[] buffer) - пытается читать байты в буфер, возвращая количество прочитанных байтов. По достижении конца файла возвращает значение -1
+int	read(byte[] buffer, int byteOffset, int byteCount) - пытается читать до byteCount байт в buffer, начиная с смещения byteOffset. По достижении конца файла возвращает -1
+reset() - сбрасывает входной указатель в ранее установленную метку
+long skip(long byteCount) - пропускает byteCount байт ввода, возвращая количество проигнорированных байтов
+Как преобразовать InputStream в строку
+На stackoverflow дали развёрнутый ответ из 11 вариантов. Есть вариант на русском.
+
+Using IOUtils.toString (Apache Utils):
+
+String result = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+Using CharStreams (guava)
+
+String result = CharStreams.toString(new InputStreamReader(
+      inputStream, Charsets.UTF_8));
+Using Scanner (JDK)
+символ «\А» является символом начала текста, таким образом вызов next() вернет сразу всю строку.
+
+Scanner s = new Scanner(inputStream).useDelimiter("\\A");
+String result = s.hasNext() ? s.next() : "";
+Using Stream Api (Java 8). Warning: This solution convert different linebreaks (like \r\n) to \n.
+
+String result = new BufferedReader(new InputStreamReader(inputStream))
+  .lines().collect(Collectors.joining("\n"));
+Using parallel Stream Api (Java 8). Warning: This solution convert different linebreaks (like \r\n) to \n.
+
+String result = new BufferedReader(new InputStreamReader(inputStream)).lines()
+   .parallel().collect(Collectors.joining("\n"));
+Using InputStreamReader and StringBuilder (JDK)
+
+final int bufferSize = 1024;
+final char[] buffer = new char[bufferSize];
+final StringBuilder out = new StringBuilder();
+Reader in = new InputStreamReader(inputStream, "UTF-8");
+for (; ; ) {
+    int rsz = in.read(buffer, 0, buffer.length);
+    if (rsz < 0)
+        break;
+    out.append(buffer, 0, rsz);
+}
+return out.toString();
+Using StringWriter and IOUtils.copy (Apache Commons)
+
+StringWriter writer = new StringWriter();
+IOUtils.copy(inputStream, writer, "UTF-8");
+return writer.toString();
+Using ByteArrayOutputStream and inputStream.read (JDK)
+
+ByteArrayOutputStream result = new ByteArrayOutputStream();
+byte[] buffer = new byte[1024];
+int length;
+while ((length = inputStream.read(buffer)) != -1) {
+    result.write(buffer, 0, length);
+}
+return result.toString("UTF-8");
+Using BufferedReader (JDK). Warning: This solution convert different linebreaks (like \n\r) to line.separator system property (for example, in Windows to "\r\n").
+
+String newLine = System.getProperty("line.separator");
+BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+StringBuilder result = new StringBuilder();
+String line; boolean flag = false;
+while ((line = reader.readLine()) != null) {
+    result.append(flag? newLine: "").append(line);
+    flag = true;
+}
+return result.toString();
+Using BufferedInputStream and ByteArrayOutputStream (JDK)
+
+BufferedInputStream bis = new BufferedInputStream(inputStream);
+ByteArrayOutputStream buf = new ByteArrayOutputStream();
+int result = bis.read();
+while(result != -1) {
+    buf.write((byte) result);
+    result = bis.read();
+}
+return buf.toString();
+Using inputStream.read() and StringBuilder (JDK). Warning: This soulition has problem with Unicode, for example with Russian text (work correctly only with non-Unicode text)
+
+int ch;
+StringBuilder sb = new StringBuilder();
+while((ch = inputStream.read()) != -1)
+    sb.append((char)ch);
+reset();
+return sb.toString();
+Warning:
+Solutions 4, 5 and 9 convert different linebreaks to one.
+Soulution 11 can't work correclty with Unicode text
+
+BufferedInputStream
+Буферизация ввода-вывода является удобным способом оптимизации производительности, позволяя заключить в оболочку любой поток класса InputStream.
+
+У класса есть конструктор, где размер буфера устанавливается по умолчанию. Также можно использовать конструктор, где размер буфера устанавливается вручную. Рекомендуется использовать размеры буфера, кратные размеру страницы памяти, дисковому блоку и т.п. и может зависеть от принимающей операционной системы, объёма доступной памяти и конфигурации машины.
+
+ByteArrayInputStream
+Класс ByteArrayInputStream использует байтовый массив в качестве источника данных. У данного класса можно не вызывать метод close().
+
+DataInputStream - Форматированное чтение из памяти
+Для чтения байтовых данных (не строк) применяется класс DataInputStream. В этом случае необходимо использовать классы из группы InputStream.
+
+Для преобразования строки в массив байтов, пригодный для помещения в поток ByteArrayInputStream, в классе String предусмотрен метод getBytes(). Полученный ByteArrayInputStream представляет собой поток InputStream, подходящий для передачи DataInputStream.
+
+При побайтовом чтении символов из форматированного потока DataInputStream методом readByte() любое полученное значение будет считаться действительным, поэтому возвращаемое значение неприменимо для идентификации конца потока. Вместо этого можно использовать метод available(), который сообщает, сколько еще осталось символов.
+
+Класс DataInputStream позволяет читать элементарные данные из потока через интерфейс DataInput, который определяет методы, преобразующие элементарные значения в форму последовательности байтов. Такие потоки облегчают сохранение в файле двоичных данных.
+
+Конструктор:
+
+
+DataInputStream(InputStream stream)
+Методы:
+
+readDouble()
+readBoolean()
+readInt()
+FileInputStream
+Класс FileInputStream создаёт объект класса InputStream, который можно использовать для чтения байтов из файла.
+
+Конструкторы
+
+FileInputStream (File file) - указывается объекта типа File
+FileInputStream (FileDescriptor fd)
+FileInputStream (String path) - указывается полное имя файла
+При создании объект открывается для чтения. Класс переопределяет методы класса InputStream, кроме методов mark() и reset().
+
+Для чтения байтов входного потока из файла используется конструкция:
+
+
+File file = ...
+InputStream in = null;
+    try {
+        in = new BufferedInputStream(new FileInputStream(file));
+        ...
+    finally {
+        if (in != null) {
+            in.close();
+        }
+    }
+ }
+PushbackInputStream
+Разновидность буферизации, обеспечивающая чтение байта с последующим его возвратом в поток. Класс PushbackInputStream представляет механизм "заглянуть" во входной поток и увидеть, что оттуда поступит в следующий раз, не извлекая информации.
+
+У класса есть дополнительный метод unread().
+
+SequenceInputStream
+Класс SequenceInputStream позволяет соединять вместе несколько экземпляров класса InputStream. Конструктор принимает в качестве аргумента либо пару объектов класса InputStream, либо интерфейс Enumeration.
+
+Во время работы класс выполняет запросы на чтение из первого объекта класса InputStream и до конца, а затем переключается на второй. При использовании интерфейса работа продолжится по всем объектам класса InputStream. По достижении конца каждого файла, связанный с ним поток закрывается. Закрытие потока, созданного объектом класса SequenceInputStream, приводит к закрытию всех открытых потоков.
